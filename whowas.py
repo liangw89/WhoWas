@@ -111,8 +111,12 @@ def init_config():
 def excute_sql_no_return(sql):
 	conn=sqldb.connect(host=DB_ADDR,user=DB_USER,passwd=DB_PWD,db=DB_NAME)
 	cur=conn.cursor()
-	cur.execute(sql)
-	conn.commit()
+	try:
+		cur.execute(sql)
+		conn.commit()
+	except:
+		#log
+		pass
 	cur.close()
 	conn.close()
 
@@ -122,11 +126,9 @@ def init_db():
 	one for robot.txt information.
 	"""
 	for tb in TB_SQL:
-		try:
-			excute_sql_no_return(TB_SQL[tb])
-		except:
-			continue
-	
+		excute_sql_no_return(TB_SQL[tb])
+		
+			
 def create_tb():
 	"""
 	Create tables based on table template.
