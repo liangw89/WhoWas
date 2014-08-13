@@ -9,6 +9,7 @@ import MySQLdb
 from functools import wraps
 from scapy.all import *
 import robotparser
+
 reload(sys) 
 sys.setdefaultencoding('utf8')
 header={
@@ -70,22 +71,21 @@ def init_db():
 	conn.close()
 
 class UserDefinedException(Exception):
-	class LongTimeout(Exception):
-		args="LongTimeOut"
+	class LongTimeoutError(Exception):
+		args="LongTimeOut Error"
 
-class MyTimeout(object):
+class LongTimeout(object):
 	"""docstring for """
 	def __init__(self, timeout):
 		self.timeout=timeout
+
 	def __get__(self, obj, type=None):
 		return self.__class__(self.func.__get__(obj, type))
 
 	def __call__(self, func):
 		self.func=func
-		
 		def _handle_timeout(signum, frame,self=None):
-			raise UserDefinedException.LongTimeout()
-
+			raise UserDefinedException.LongTimeoutError()
 		def wrapper(*args, **kwargs):
 			signal.signal(signal.SIGALRM, _handle_timeout)
 			signal.alarm(self.timeout)
@@ -96,22 +96,35 @@ class MyTimeout(object):
 			return result
 		return wraps(self.func)(wrapper)
 
-		#return decorator
-	  
-def open_port(ip,*ports):
-		#print ports
-		res=[]
-		for port in ports:
-			if sr1(IP(dst=ip)/TCP(dport=port, flags='S'), verbose=0, timeout=1):
-				res.append(port)
-		#print res
-		return res
 
-def scan_port(ip):
+def probe_port(ip,*ports):
+	"""
+	Send TCP SYN probs to ports of a given IP.
+	Returns : a Python list that contains open ports of target IP
+	:param ip: target IP address
+	:para ports: target ports.
+
+	Usage::
+		>> probe_port("1.1.1.1", 80,81,82)
+		>> probe_port("1.1.1.1", *[80,81,82])
+	"""
 	res=[]
-	res=open_port(ip, 80,443)
+	for port in ports:
+		if sr1(IP(dst=ip)/TCP(dport=port, flags='S'), verbose=0, timeout=1):
+			res.append(port)
+	return res
+
+def get_open_ports(ip):
+	"""
+	First probe port 80 and 443 of an IP, if neither of them is open, 
+	then probe  port 22.
+	Returns : a list contains open ports of target IP, eg. [22,80,443]
+	:param ip: target IP address
+	"""
+	res=[]
+	res=probe_port(ip, 80,443)
 	if not res:
-		res=open_port(ip, 22)
+		res=probe_port(ip, 22)
 	return res
 	
 
@@ -130,7 +143,7 @@ def worker(inq,no,sc=1):
 		try:
 			if sc==1:
 				try:
-					res=scan_port(tip)
+					res=get_open_ports(tip)
 				except:
 					continue
 				if not res:
@@ -223,19 +236,19 @@ def worker(inq,no,sc=1):
 
 
 class Manager(object):
-	"""docstring for Manager"""
+	"""
+	This is a multiprocess queue.
+	"""
 	def __init__(self):
 		self.inq=multiprocessing.Queue()
 		self.pool=[]
 		self.level=0
 
-
-	def add_worker(self,func,no,sc):
-		p=multiprocessing.Process(target=func, args=(self.inq,no,sc))
+	def add_worker(self,func,no,prob_flag):
+		p=multiprocessing.Process(target=func, args=(self.inq,no,prob_flag))
 		self.pool.append(p)
 		p.daemon = True
 		p.start()
-
 
 	def run_manger(self,no):
 		stop_flag=0
@@ -250,7 +263,6 @@ class Manager(object):
 				if self.inq.empty():
 					stop_flag=stop_flag+1
 
-
 	def wait(self):
 		for t  in self.pool:
 			t.join()
@@ -262,8 +274,6 @@ class Crawler(object):
 	def __init__(self):
 		self.timeout=10
 		self.type_filter=['application/','audio/','image/','video/']
-		#self.file_filter=['.avi','.mp3','.xml','.txt','.pdf','.wmv','.flac','.ape','.mp4','.jpg','.css','.jpeg','.bmp','.png','.as','.gif','.ico','.zip','.exe','.dmg','.rar']
-		pass
 
 	def get_header(self,url,verf=False):
 		url=url
@@ -272,21 +282,19 @@ class Crawler(object):
 		count=1
 		try:
 			r=requests.get(url,allow_redirects=True,stream=True,verify=verf,headers=header,timeout=self.timeout)
-		except (requests.exceptions.SSLError,requests.exceptions.ConnectionError,UserDefinedException.LongTimeout,requests.exceptions.TooManyRedirects,requests.exceptions.HTTPError,requests.exceptions.Timeout) as e:
-			#print "[EXCEPTION]",url,e.args
+		except (requests.exceptions.SSLError,requests.exceptions.ConnectionError,
+			UserDefinedException.LongTimeoutError,requests.exceptions.TooManyRedirects,
+			requests.exceptions.HTTPError,requests.exceptions.Timeout) as e:
 			return False,str(e.args)[0:15],False,False,False
-		
 		return True,r,r.status_code,dict(**r.headers),r.elapsed.total_seconds()
 
-	@MyTimeout(12)
+	@LongTimeout(12)
 	def get_content(self,url):
 
 		flag,r,rcode,rheader,rtt=self.get_header(url)
 		if not flag:
 			return flag,r,rcode,rheader,rtt
 		else:
-			#if r.url in dmbl:
-				
 			if rheader.has_key('content-length'):
 				if int(rheader['content-length']) >=MAXLEN:
 					return False,"TargetSizeTooLarge",rcode,rheader,rtt
@@ -353,18 +361,6 @@ if __name__ == '__main__':
 	#url="http://54.245.231.247"
 	print "start work"
 	go("ec2_ip_mar.li",1)
-	#go("ec2_ip_mar.li",1)
-	#go("ec2_ip_mar.li",1)
-	#go("ec2_ip_mar.li",1)
-	#go("ec2_ip_mar.li",1)
-	#go("ec2_ip_mar.li",1)
-	#go("ec2_ip_mar.li",1)
-	#go("ec2_ip_mar.li",1)
-	#go("ip_redo","zmap_finish",0)
-	#t=time.strftime('%Y-%m-%d',time.localtime(time.time()))
-	#os.popen("cat crawl_finish zmap_finish > all_"+str(t)+".res")
-	#os.popen("rm ip_todo ip_redo crawl_finish zmap_finish zmap_out")
-	#test()
 
 
 
