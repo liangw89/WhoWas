@@ -1,5 +1,8 @@
 """ robotparser.py
+    We grab the file from Python urllib, but add few changes  
 
+"""
+"""
     Copyright (C) 2000  Bastian Kleineidam
 
     You can choose between two licenses when using this package:
@@ -15,9 +18,9 @@ import StringIO
 reload(sys) 
 sys.setdefaultencoding('utf8')
 header={
-    "User-Agent":"Mozilla/5.0 (X11; U; Linux i686) Web-Security/1.0(it's for a research study,if you have questions,plz contact me liangw@cs.wisc.edu)",
-    "From":"liangw@cs.wisc.edu",
-    "Referer":"http://www.google.com",
+    "User-Agent":"Mozilla/5.0 (X11; U; Linux i686)",
+    "From":"your email@example.edu",
+    "Referer":"your website",
     "Accept":"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
     "Accept-Language":"en;q=0.5",
     "Accept-Charset":"utf-8;q=0.7,*;q=0.7",
