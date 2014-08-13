@@ -16,6 +16,7 @@ reload(sys)
 sys.setdefaultencoding('utf8')
 
 def init_config():
+	"""Configurations, read from config.ini"""
 	global DB_ADDR 
 	global DB_USER
 	global DB_PWD
@@ -27,6 +28,9 @@ def init_config():
 	global TB_ROBOT_PREFIX
 	global TB_SUFFIX
 	global TB_SQL
+	global TB_BASE_NAME
+	global TB_ROBOT_NAME
+	
 
 	global INPUT_FILE
 	global WORKER_NO
@@ -56,8 +60,6 @@ def init_config():
 	MAX_CONTENT_LENGTH=config.get('Basic','MAX_CONTENT_LENGTH')
 	RECORD_NO_LIMIT=config.get('Basic','RECORD_NO_LIMIT')
 	BLACKIST_FILE=config.get('Basic','BLACKIST_FILE')
-
-	TB_SUFFIX=time.strftime('%Y%m%d%H%M')
 
 	HTTP_HEADER={
 	"User-Agent":"Mozilla/5.0 (X11; U; Linux i686)",
@@ -101,29 +103,36 @@ def init_config():
 	  "KEY `rtt` (`rtt`)"
 	  ") ENGINE=InnoDB DEFAULT CHARSET=utf8 AUTO_INCREMENT=1" )
 
-def init_db():
-	conn=sqldb.connect(host=DB_ADDR,user=DB_USER,passwd=DB_PWD,db=DB_NAME)
-	cur=conn.cursor()
-	for tb in TB_SQL:
-		try:
-			cur.execute(TB_SQL[tb])
-		except:
-			continue
-	cur.close()
-	conn.close()
-
-
-def create_db():
-	global TB_BASE_NAME
-	global TB_ROBOT_NAME
+	TB_SUFFIX=time.strftime('%Y%m%d%H%M')
 	TB_BASE_NAME="%s%s"%(TB_BASE_PREFIX,TB_SUFFIX)
 	TB_ROBOT_NAME="%s%s"%(TB_ROBOT_PREFIX,TB_SUFFIX)
+
+
+def excute_sql_no_return(sql):
 	conn=sqldb.connect(host=DB_ADDR,user=DB_USER,passwd=DB_PWD,db=DB_NAME)
 	cur=conn.cursor()
-	cur.execute("create table %s like %s"%(TB_BASE_NAME,TB_BASE_TEMPLATE))
-	cur.execute("create table %s like %s"%(TB_ROBOT_NAME,TB_ROBOT_TEMPLATE))
+	cur.execute(sql)
+	conn.commit()
 	cur.close()
 	conn.close()
+
+def init_db():
+	"""
+	Init two table templates, one for basic scanning information and 
+	one for robot.txt information.
+	"""
+	for tb in TB_SQL:
+		try:
+			excute_sql_no_return(TB_SQL[tb])
+		except:
+			continue
+	
+def create_tb():
+	"""
+	Create tables based on table template.
+	"""
+	excute_sql_no_return("create table %s like %s"%(TB_BASE_NAME,TB_BASE_TEMPLATE))
+	excute_sql_no_return("create table %s like %s"%(TB_ROBOT_NAME,TB_ROBOT_TEMPLATE))
 
 def probe_port(ip,*ports):
 	"""
@@ -266,7 +275,7 @@ def worker(inq,no,sc=1):
 def go(fin,sc):
 	init_config()
 	init_db()
-	create_db()
+	create_tb()
 	sys.exit()
 	m=Manager()
 	ipbl=[]
@@ -408,17 +417,6 @@ def main():
 	print "start work"
 	go("ec2_ip_mar.li",1)
 
-
-
-def test():
-	#url="http://54.232.112.62"
-	#url="http://54.243.166.47"
-	#url="http://www.facebook.com\\/l.php?u=http\\u00253A\\u00252F\\u00252Fbit.ly\\u00252F1as3BOz&amp;h=BAQGr-zcD&amp;s=1&quot;)"
-	
-	c=Crawler()
-	url="http://54.245.97.184"
-	url="http://54.245.231.247"
-	print c.get_content(url)
 
 	
 if __name__ == '__main__':
