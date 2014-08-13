@@ -77,29 +77,30 @@ def init_db():
 	  "KEY `rtt` (`rtt`)"
 	  ") ENGINE=InnoDB DEFAULT CHARSET=utf8 AUTO_INCREMENT=1" )
 
-	print DB_ADDR,DB_USER,DB_PWD,DB_NAME
 	conn=sqldb.connect(host=DB_ADDR,user=DB_USER,passwd=DB_PWD,db=DB_NAME)
 	cur=conn.cursor()
-	print TABLES
 	for tb in TABLES:
 		cur.execute(TABLES[tb])
-	conn.close()
-
-def test():
-	db_name="scanner_%s"%(str_time)
-	db_r_name="scanner_robot_%s"%(str_time)
-	
-	conn=sqldb.connect(host=dbaddr,user=dbuser,passwd=pwd,db=dbn)
-	cur=conn.cursor()
-	cur.execute("create table %s like scanner"%(db_name))
-	conn.commit()
-	cur.execute("create table %s like scanner_robot"%(db_r_name))
-	conn.commit()
 	cur.close()
 	conn.close()
 
+
+def create_db():
+	global TB_BASE_NAME
+	global TB_ROBOT_NAME
+	TB_BASE_NAME="%s_%s"%(TB_BASE_PREFIX,TB_SUFFIX)
+	TB_ROBOT_NAME="%s_%s"%(TB_ROBOT_PREFIX,TB_SUFFIX)
+	conn=sqldb.connect(host=DB_ADDR,user=DB_USER,passwd=DB_PWD,db=DB_NAME)
+	cur=conn.cursor()
+	cur.execute("create table %s like %s"%(TB_BASE_NAME,TB_BASE_TEMPLATE))
+	cur.execute("create table %s like %s"%(TB_ROBOT_NAME,TB_ROBOT_TEMPLATE))
+	cur.close()
+	conn.close()
+
+
 init_config()
 init_db()
+create_db()
 sys.exit()
 
 
