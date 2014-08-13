@@ -1,6 +1,9 @@
 import os,sys,cPickle,time,urllib2,re,signal,commands,errno,ConfigParser
 
-
+try:
+	import MySQLdb as sqldb
+except:
+	import pymysql as sqldb
 
 def init_config():
 	global DB_ADDR 
@@ -12,6 +15,7 @@ def init_config():
 	global TB_BASE_PREFIX
 	global TB_ROBOT_TEMPLATE 
 	global TB_ROBOT_PREFIX
+	global TB_SUFFIX
 
 	global WORKER_NO
 	global CONTENT_LENGTH_LIMIT
@@ -38,20 +42,54 @@ def init_config():
 	RECORD_NO_LIMIT=config.get('Basic','RECORD_NO_LIMIT')
 	BLACKIST_FILE=config.get('Basic','BLACKIST_FILE')
 
+	TB_SUFFIX=time.strftime('%Y%m%d%H')
 
 def init_db():
-	global start_time
-	global str_time
-	global db_name
-	global db_r_name
-	print "aa",DB_ADDR, DB_USER, DB_PWD
-	start_time=time.strftime('%Y-%m-%d')
-	str_time=time.strftime('%Y%m%d%H')
-	print str_time
+	TABLES={}
+	TABLES[TB_BASE_TEMPLATE]=(
+	  "CREATE TABLE IF NOT EXISTS "+"`"+TB_BASE_TEMPLATE+"`"+" ("
+	  "`tid` int(12) NOT NULL AUTO_INCREMENT,"
+	  "`ip` varchar(64) DEFAULT NULL,"
+	  "`port` varchar(64) DEFAULT NULL,"
+	  "`code` varchar(64) DEFAULT NULL,"
+	  "`header` text,"
+	  "`content` text,"
+	  "`time` varchar(64) DEFAULT NULL,"
+	  "`rtt` varchar(64) NOT NULL,"
+	  "PRIMARY KEY (`tid`),"
+	  "KEY `ip` (`ip`),"
+	  "KEY `time` (`time`),"
+	  "KEY `iport` (`port`),"
+	  "KEY `icode` (`code`),"
+	  "KEY `rtt` (`rtt`)"
+	  ") ENGINE=InnoDB DEFAULT CHARSET=utf8 AUTO_INCREMENT=1" )
+
+	TABLES[TB_ROBOT_TEMPLATE]=(
+	  "CREATE TABLE IF NOT EXISTS "+"`"+TB_ROBOT_TEMPLATE+"`"+" ("
+	  "`tid` int(12) NOT NULL AUTO_INCREMENT,"
+	  "`ip` varchar(64) DEFAULT NULL,"
+	  "`content` text,"
+	  "`time` varchar(64) DEFAULT NULL,"
+	  "`rtt` varchar(64) NOT NULL,"
+	  "PRIMARY KEY (`tid`),"
+	  "KEY `ip` (`ip`),"
+	  "KEY `time` (`time`),"
+	  "KEY `rtt` (`rtt`)"
+	  ") ENGINE=InnoDB DEFAULT CHARSET=utf8 AUTO_INCREMENT=1" )
+
+	print DB_ADDR,DB_USER,DB_PWD,DB_NAME
+	conn=sqldb.connect(host=DB_ADDR,user=DB_USER,passwd=DB_PWD,db=DB_NAME)
+	cur=conn.cursor()
+	print TABLES
+	for tb in TABLES:
+		cur.execute(TABLES[tb])
+	conn.close()
+
+def test():
 	db_name="scanner_%s"%(str_time)
 	db_r_name="scanner_robot_%s"%(str_time)
 	
-	conn=MySQLdb.connect(host=dbaddr,user=dbuser,passwd=pwd,db=dbn)
+	conn=sqldb.connect(host=dbaddr,user=dbuser,passwd=pwd,db=dbn)
 	cur=conn.cursor()
 	cur.execute("create table %s like scanner"%(db_name))
 	conn.commit()
@@ -62,7 +100,7 @@ def init_db():
 
 init_config()
 init_db()
-
+sys.exit()
 
 
 
@@ -72,7 +110,7 @@ import zlib,fcntl
 import multiprocessing
 from multiprocessing import Queue,JoinableQueue
 from urlparse import urlparse,urljoin
-import MySQLdb
+#import MySQLdb
 from functools import wraps
 from scapy.all import *
 import robotparser
@@ -94,7 +132,6 @@ ipbl=[]
 DEBUG=False
 
 
-start_time=time.strftime('%Y-%m-%d')
 str_time=time.strftime('%Y%m%d')
 db_name="scanner_%s"%(str_time)
 db_r_name="scanner_robot_%s"%(str_time)
@@ -230,7 +267,7 @@ def worker(inq,no,sc=1):
 			dbl=dbl+1
 
 			if dbl==MAXDBLEN:
-				conn=MySQLdb.connect(host=dbaddr,user=dbuser,passwd=pwd,db=dbn)
+				conn=sqldb.connect(host=dbaddr,user=dbuser,passwd=pwd,db=dbn)
 				cur=conn.cursor()
 				cur.executemany("INSERT INTO "+db_name+"(ip,port,code,header,content,time,rtt) VALUES (%s,%s,%s,%s,%s,%s,%s)",db)
 				conn.commit()
@@ -239,7 +276,7 @@ def worker(inq,no,sc=1):
 				db=[]
 				dbl=0
 			if dbrbl==MAXDBLEN:
-				conn=MySQLdb.connect(host=dbaddr,user=dbuser,passwd=pwd,db=dbn)
+				conn=sqldb.connect(host=dbaddr,user=dbuser,passwd=pwd,db=dbn)
 				cur=conn.cursor()
 				cur.executemany("INSERT INTO "+db_r_name+"(ip,content,time,rtt) VALUES (%s,%s,%s,%s)",dbrb)
 				conn.commit()
@@ -398,7 +435,7 @@ if __name__ == '__main__':
 	#url="http://54.245.231.247"
 	print "start work"
 	print DB_PWD
-	go("ec2_ip_mar.li",1)
+	#go("ec2_ip_mar.li",1)
 
 
 
