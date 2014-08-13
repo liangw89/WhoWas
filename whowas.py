@@ -1,9 +1,19 @@
 import os,sys,cPickle,time,urllib2,re,signal,commands,errno,ConfigParser
+import requests
+import zlib,fcntl
+import multiprocessing
+import robotparser
+from urlparse import urlparse,urljoin
+from functools import wraps
+from scapy.all import *
 
 try:
 	import MySQLdb as sqldb
 except:
 	import pymysql as sqldb
+
+reload(sys) 
+sys.setdefaultencoding('utf8')
 
 def init_config():
 	global DB_ADDR 
@@ -16,12 +26,16 @@ def init_config():
 	global TB_ROBOT_TEMPLATE 
 	global TB_ROBOT_PREFIX
 	global TB_SUFFIX
+	global TB_SQL
 
+	global INPUT_FILE
 	global WORKER_NO
 	global CONTENT_LENGTH_LIMIT
 	global MAX_CONTENT_LENGTH
 	global RECORD_NO_LIMIT
 	global BLACKIST_FILE
+
+	global HTTP_HEADER
 
 	config = ConfigParser.ConfigParser()
 	config.read('config.ini')
@@ -36,17 +50,27 @@ def init_config():
 	TB_ROBOT_TEMPLATE=config.get('DataBase','TB_ROBOT_TEMPLATE')
 	TB_ROBOT_PREFIX=config.get('DataBase','TB_ROBOT_PREFIX')	
 
+	INPUT_FILE = config.get('Basic','INPUT_FILE')
 	WORKER_NO=config.get('Basic','WORKER_NO')
 	CONTENT_LENGTH_LIMIT=config.get('Basic','CONTENT_LENGTH_LIMIT')
 	MAX_CONTENT_LENGTH=config.get('Basic','MAX_CONTENT_LENGTH')
 	RECORD_NO_LIMIT=config.get('Basic','RECORD_NO_LIMIT')
 	BLACKIST_FILE=config.get('Basic','BLACKIST_FILE')
 
-	TB_SUFFIX=time.strftime('%Y%m%d%H')
+	TB_SUFFIX=time.strftime('%Y%m%d%H%M')
 
-def init_db():
-	TABLES={}
-	TABLES[TB_BASE_TEMPLATE]=(
+	HTTP_HEADER={
+	"User-Agent":"Mozilla/5.0 (X11; U; Linux i686)",
+	"From":"admin@example.com",
+	"Referer":"http://example.com",
+	"Accept":"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+	"Accept-Language":"en;q=0.5",
+	"Accept-Charset":"utf-8;q=0.7,*;q=0.7",
+	"Connection":"close"
+	}
+
+	TB_SQL={}
+	TB_SQL[TB_BASE_TEMPLATE]=(
 	  "CREATE TABLE IF NOT EXISTS "+"`"+TB_BASE_TEMPLATE+"`"+" ("
 	  "`tid` int(12) NOT NULL AUTO_INCREMENT,"
 	  "`ip` varchar(64) DEFAULT NULL,"
@@ -64,7 +88,7 @@ def init_db():
 	  "KEY `rtt` (`rtt`)"
 	  ") ENGINE=InnoDB DEFAULT CHARSET=utf8 AUTO_INCREMENT=1" )
 
-	TABLES[TB_ROBOT_TEMPLATE]=(
+	TB_SQL[TB_ROBOT_TEMPLATE]=(
 	  "CREATE TABLE IF NOT EXISTS "+"`"+TB_ROBOT_TEMPLATE+"`"+" ("
 	  "`tid` int(12) NOT NULL AUTO_INCREMENT,"
 	  "`ip` varchar(64) DEFAULT NULL,"
@@ -77,10 +101,14 @@ def init_db():
 	  "KEY `rtt` (`rtt`)"
 	  ") ENGINE=InnoDB DEFAULT CHARSET=utf8 AUTO_INCREMENT=1" )
 
+def init_db():
 	conn=sqldb.connect(host=DB_ADDR,user=DB_USER,passwd=DB_PWD,db=DB_NAME)
 	cur=conn.cursor()
-	for tb in TABLES:
-		cur.execute(TABLES[tb])
+	for tb in TB_SQL:
+		try:
+			cur.execute(TB_SQL[tb])
+		except:
+			continue
 	cur.close()
 	conn.close()
 
@@ -88,89 +116,14 @@ def init_db():
 def create_db():
 	global TB_BASE_NAME
 	global TB_ROBOT_NAME
-	TB_BASE_NAME="%s_%s"%(TB_BASE_PREFIX,TB_SUFFIX)
-	TB_ROBOT_NAME="%s_%s"%(TB_ROBOT_PREFIX,TB_SUFFIX)
+	TB_BASE_NAME="%s%s"%(TB_BASE_PREFIX,TB_SUFFIX)
+	TB_ROBOT_NAME="%s%s"%(TB_ROBOT_PREFIX,TB_SUFFIX)
 	conn=sqldb.connect(host=DB_ADDR,user=DB_USER,passwd=DB_PWD,db=DB_NAME)
 	cur=conn.cursor()
 	cur.execute("create table %s like %s"%(TB_BASE_NAME,TB_BASE_TEMPLATE))
 	cur.execute("create table %s like %s"%(TB_ROBOT_NAME,TB_ROBOT_TEMPLATE))
 	cur.close()
 	conn.close()
-
-
-init_config()
-init_db()
-create_db()
-sys.exit()
-
-
-
-import requests
-from socket import *
-import zlib,fcntl
-import multiprocessing
-from multiprocessing import Queue,JoinableQueue
-from urlparse import urlparse,urljoin
-#import MySQLdb
-from functools import wraps
-from scapy.all import *
-import robotparser
-
-reload(sys) 
-sys.setdefaultencoding('utf8')
-header={
-	"User-Agent":"Mozilla/5.0 (X11; U; Linux i686) Web-Security/1.0(it's for a research study,if you have questions,plz contact me liangw@cs.wisc.edu)",
-	"From":"liangw@cs.wisc.edu",
-	"Referer":"https://sites.google.com/site/whowasproject/",
-	"Accept":"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-	"Accept-Language":"en;q=0.5",
-	"Accept-Charset":"utf-8;q=0.7,*;q=0.7",
-	"Connection":"close"
-	}
-
-dmbl=["www.socialrel8.com","newsnear-alpha.elasticbeanstalk.com","www.healpay.com","www.draftkings.com","r1.draftkings.com","r2.draftkings.com","r3.draftkings.com","www.brightedge.com","www.maydesigns.com","www.letstaggle.com"]
-ipbl=[]
-DEBUG=False
-
-
-str_time=time.strftime('%Y%m%d')
-db_name="scanner_%s"%(str_time)
-db_r_name="scanner_robot_%s"%(str_time)
-
-
-dbaddr="localhost"
-dbuser="root"
-pwd="w82776569"
-dbn="scan1"
-
-
-
-class UserDefinedException(Exception):
-	class LongTimeoutError(Exception):
-		args="LongTimeOut Error"
-
-class LongTimeout(object):
-	"""docstring for """
-	def __init__(self, timeout):
-		self.timeout=timeout
-
-	def __get__(self, obj, type=None):
-		return self.__class__(self.func.__get__(obj, type))
-
-	def __call__(self, func):
-		self.func=func
-		def _handle_timeout(signum, frame,self=None):
-			raise UserDefinedException.LongTimeoutError()
-		def wrapper(*args, **kwargs):
-			signal.signal(signal.SIGALRM, _handle_timeout)
-			signal.alarm(self.timeout)
-			try:
-				result = self.func(*args, **kwargs)
-			finally:
-				signal.alarm(0)
-			return result
-		return wraps(self.func)(wrapper)
-
 
 def probe_port(ip,*ports):
 	"""
@@ -201,7 +154,7 @@ def get_open_ports(ip):
 	if not res:
 		res=probe_port(ip, 22)
 	return res
-	
+
 
 def worker(inq,no,sc=1):
 	#print i,j
@@ -310,6 +263,58 @@ def worker(inq,no,sc=1):
 	
 
 
+def go(fin,sc):
+	init_config()
+	init_db()
+	create_db()
+	sys.exit()
+	m=Manager()
+	ipbl=[]
+	for i in range(0,WORKER_NO):
+		m.add_worker(worker,i,sc)
+	for d in dmbl:
+		ipbl=ipbl+[v.strip("\n") for v in os.popen("dig +short %s"%(d)).readlines()]
+	ipbl=ipbl+[v.strip("\n") for v in open("blacklist").readlines()]
+	print ipbl
+	#sys.exit()
+	for i in open(fin):
+		ip=i.strip("\n")
+		if ip in ipbl:
+			print ip,"in bl"
+			continue
+		m.inq.put(ip)
+	
+	m.run_manger(WORKER_NO)
+	m.wait()
+
+
+class UserDefinedException(Exception):
+	class LongTimeoutError(Exception):
+		args="LongTimeOut Error"
+
+class LongTimeout(object):
+	"""docstring for """
+	def __init__(self, timeout):
+		self.timeout=timeout
+
+	def __get__(self, obj, type=None):
+		return self.__class__(self.func.__get__(obj, type))
+
+	def __call__(self, func):
+		self.func=func
+		def _handle_timeout(signum, frame,self=None):
+			raise UserDefinedException.LongTimeoutError()
+		def wrapper(*args, **kwargs):
+			signal.signal(signal.SIGALRM, _handle_timeout)
+			signal.alarm(self.timeout)
+			try:
+				result = self.func(*args, **kwargs)
+			finally:
+				signal.alarm(0)
+			return result
+		return wraps(self.func)(wrapper)
+
+
 class Manager(object):
 	"""
 	This is a multiprocess queue.
@@ -399,26 +404,7 @@ class Crawler(object):
 			return True,"Timeout",rp.rtt
 
 
-def go(fin,sc):
-	init_db()
-	m=Manager()
-	ipbl=[]
-	for i in range(0,WORKER_NO):
-		m.add_worker(worker,i,sc)
-	for d in dmbl:
-		ipbl=ipbl+[v.strip("\n") for v in os.popen("dig +short %s"%(d)).readlines()]
-	ipbl=ipbl+[v.strip("\n") for v in open("blacklist").readlines()]
-	print ipbl
-	#sys.exit()
-	for i in open(fin):
-		ip=i.strip("\n")
-		if ip in ipbl:
-			print ip,"in bl"
-			continue
-		m.inq.put(ip)
-	
-	m.run_manger(WORKER_NO)
-	m.wait()
+
 
 
 def test():
