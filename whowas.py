@@ -115,7 +115,19 @@ def excute_sql_no_return(sql):
 		cur.execute(sql)
 		conn.commit()
 	except Exception, e:
-		print e
+		print e #change to log
+		pass
+	cur.close()
+	conn.close()
+
+def excute_sql_bulk_no_return(sql, param):
+	conn=sqldb.connect(host=DB_ADDR,user=DB_USER,passwd=DB_PWD,db=DB_NAME)
+	cur=conn.cursor()
+	try:
+		cur.executemany(sql,param)
+		conn.commit()
+	except Exception, e:
+		print e #change to log
 		pass
 	cur.close()
 	conn.close()
@@ -165,21 +177,21 @@ def get_open_ports(ip):
 		res=probe_port(ip, 22)
 	return res
 
-
-def worker(inq,no,sc=1):
+"""need to fix it"""
+def worker(inq,no,probe_flag=True):
 	#print i,j
 	c=Crawler()
 	
-	db=[]
-	dbrb=[]
-	dbl=0
-	dbrbl=0
+	tb_base=[]
+	tb_robot=[]
+	tb_base_len=0
+	tb_robot_len=0
 	for tip in iter(inq.get, 'STOP'):
 		turl="http://"+tip
 		res=[]
 		fetch_flag=1
 		try:
-			if sc==1:
+			if probe_flag==1:
 				try:
 					res=get_open_ports(tip)
 				except:
@@ -206,8 +218,8 @@ def worker(inq,no,sc=1):
 					rbflag,rbcontent,rbrtt=c.get_robot(turl_r)
 					if rbcontent:
 						rbcontent=unicode(rbcontent,errors='ignore').encode('utf-8')
-					dbrb.append((tip,rbcontent,str(int(time.time())),str(rbrtt)))
-					dbrbl=dbrbl+1
+					tb_robot.append((tip,rbcontent,str(int(time.time())),str(rbrtt)))
+					tb_robot_len=tb_robot_len+1
 				except:
 					rbflag=True
 					f=open("err.log","a")
@@ -222,53 +234,33 @@ def worker(inq,no,sc=1):
 						f.write("content:"+tip+"\n")
 						f.close()
 				else:
-					content="ROOBOT"
+					content="ROBOT"
 			if content:
 				content=unicode(content,errors='ignore').encode('utf-8')
 			rport=sorted([str(v) for v in res])
 			rport="#".join(rport)
-			db.append((tip,rport,rcode,str(rheader),content,str(int(time.time())), str(rtt)))
-			dbl=dbl+1
+			tb_base.append((tip,rport,rcode,str(rheader),content,str(int(time.time())), str(rtt)))
+			tb_base_len=tb_base_len+1
 
-			if dbl==MAXDBLEN:
-				conn=sqldb.connect(host=dbaddr,user=dbuser,passwd=pwd,db=dbn)
-				cur=conn.cursor()
-				cur.executemany("INSERT INTO "+db_name+"(ip,port,code,header,content,time,rtt) VALUES (%s,%s,%s,%s,%s,%s,%s)",db)
-				conn.commit()
-				cur.close()
-				conn.close()
-				db=[]
-				dbl=0
-			if dbrbl==MAXDBLEN:
-				conn=sqldb.connect(host=dbaddr,user=dbuser,passwd=pwd,db=dbn)
-				cur=conn.cursor()
-				cur.executemany("INSERT INTO "+db_r_name+"(ip,content,time,rtt) VALUES (%s,%s,%s,%s)",dbrb)
-				conn.commit()
-				cur.close()
-				conn.close()
-				dbrb=[]
-				dbrbl=0
+			if tb_base_len==RECORD_NO_LIMIT:
+				excute_sql_bulk_no_return("INSERT INTO "+TB_BASE_NAME+"(ip,port,code,header,content,time,rtt) VALUES (%s,%s,%s,%s,%s,%s,%s)",tb_base)
+				tb_base=[]
+				tb_base_len=0
+			if tb_robot_len==RECORD_NO_LIMIT:
+				excute_sql_bulk_no_return("INSERT INTO "+TB_ROBOT_NAME+"(ip,content,time,rtt) VALUES (%s,%s,%s,%s)",tb_robot)
+				tb_robot=[]
+				tb_robot_len=0
 		except:
 			f=open("err.log","a")
 			f.write("unknown:"+tip+"\n")
 			f.close()
 			pass
-	conn=MySQLdb.connect(host=dbaddr,user=dbuser,passwd=pwd,db=dbn)
-	cur=conn.cursor()
-	cur.executemany("INSERT INTO "+db_name+"(ip,port,code,header,content,time,rtt) VALUES (%s,%s,%s,%s,%s,%s,%s)",db)
-	conn.commit()
-	cur.close()
-	conn.close()
-	db=[]
-	dbl=0
-	conn=MySQLdb.connect(host=dbaddr,user=dbuser,passwd=pwd,db=dbn)
-	cur=conn.cursor()
-	cur.executemany("INSERT INTO "+db_r_name+"(ip,content,time,rtt) VALUES (%s,%s,%s,%s)",dbrb)
-	conn.commit()
-	cur.close()
-	conn.close()
-	dbrb=[]
-	dbrbl=0
+	excute_sql_bulk_no_return("INSERT INTO "+TB_BASE_NAME+"(ip,port,code,header,content,time,rtt) VALUES (%s,%s,%s,%s,%s,%s,%s)",tb_base)
+	excute_sql_bulk_no_return("INSERT INTO "+TB_ROBOT_NAME+"(ip,content,time,rtt) VALUES (%s,%s,%s,%s)",tb_robot)
+	tb_base=[]
+	tb_robot=[]
+	tb_base_len=0
+	tb_robot_len=0
 	print no,"worker finish"
 	
 
@@ -334,8 +326,8 @@ class Manager(object):
 		self.pool=[]
 		self.level=0
 
-	def add_worker(self,func,no,prob_flag):
-		p=multiprocessing.Process(target=func, args=(self.inq,no,prob_flag))
+	def add_worker(self,func,work_id,probe_flag):
+		p=multiprocessing.Process(target=func, args=(self.inq,work_id,probe_flag))
 		self.pool.append(p)
 		p.daemon = True
 		p.start()
@@ -358,7 +350,7 @@ class Manager(object):
 			t.join()
 
 
-
+"""need to fix"""
 class Crawler(object):
 	"""docstring for """
 	def __init__(self):
