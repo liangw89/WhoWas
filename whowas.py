@@ -390,7 +390,7 @@ class Crawler(object):
 				
 			return True,content,rcode,rheader,rtt
 
-	@MyTimeout(12)
+	@LongTimeout(12)
 	def get_robot(self,url):
 		try:
 			rp = robotparser.RobotFileParser()
@@ -404,6 +404,10 @@ class Crawler(object):
 			return True,"Timeout",rp.rtt
 
 
+def main():
+	print "start work"
+	print DB_PWD
+	go("ec2_ip_mar.li",1)
 
 
 
@@ -420,9 +424,7 @@ def test():
 	
 if __name__ == '__main__':
 	#url="http://54.245.231.247"
-	print "start work"
-	print DB_PWD
-	#go("ec2_ip_mar.li",1)
+	main()
 
 
 
