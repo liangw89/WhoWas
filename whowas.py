@@ -114,8 +114,8 @@ def excute_sql_no_return(sql):
 	try:
 		cur.execute(sql)
 		conn.commit()
-	except:
-		#log
+	except Exception, e:
+		print e
 		pass
 	cur.close()
 	conn.close()
@@ -127,7 +127,6 @@ def init_db():
 	"""
 	for tb in TB_SQL:
 		excute_sql_no_return(TB_SQL[tb])
-		
 			
 def create_tb():
 	"""
