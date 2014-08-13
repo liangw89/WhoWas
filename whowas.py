@@ -406,7 +406,6 @@ class Crawler(object):
 
 def main():
 	print "start work"
-	print DB_PWD
 	go("ec2_ip_mar.li",1)
 
 
