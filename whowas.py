@@ -1,4 +1,71 @@
-import os,sys,cPickle,time,urllib2,re,signal,commands,errno
+import os,sys,cPickle,time,urllib2,re,signal,commands,errno,ConfigParser
+
+
+
+def init_config():
+	global DB_ADDR 
+	global DB_USER
+	global DB_PWD
+	global DB_NAME
+
+	global TB_BASE_TEMPLATE
+	global TB_BASE_PREFIX
+	global TB_ROBOT_TEMPLATE 
+	global TB_ROBOT_PREFIX
+
+	global WORKER_NO
+	global CONTENT_LENGTH_LIMIT
+	global MAX_CONTENT_LENGTH
+	global RECORD_NO_LIMIT
+	global BLACKIST_FILE
+
+	config = ConfigParser.ConfigParser()
+	config.read('config.ini')
+
+	DB_ADDR=config.get('DataBase','DB_ADDR')
+	DB_USER=config.get('DataBase','DB_USER')
+	DB_PWD=config.get('DataBase','DB_PWD')
+	DB_NAME=config.get('DataBase','DB_NAME')
+
+	TB_BASE_TEMPLATE=config.get('DataBase','TB_BASE_TEMPLATE')
+	TB_BASE_PREFIX=config.get('DataBase','TB_BASE_PREFIX')
+	TB_ROBOT_TEMPLATE=config.get('DataBase','TB_ROBOT_TEMPLATE')
+	TB_ROBOT_PREFIX=config.get('DataBase','TB_ROBOT_PREFIX')	
+
+	WORKER_NO=config.get('Basic','WORKER_NO')
+	CONTENT_LENGTH_LIMIT=config.get('Basic','CONTENT_LENGTH_LIMIT')
+	MAX_CONTENT_LENGTH=config.get('Basic','MAX_CONTENT_LENGTH')
+	RECORD_NO_LIMIT=config.get('Basic','RECORD_NO_LIMIT')
+	BLACKIST_FILE=config.get('Basic','BLACKIST_FILE')
+
+
+def init_db():
+	global start_time
+	global str_time
+	global db_name
+	global db_r_name
+	print "aa",DB_ADDR, DB_USER, DB_PWD
+	start_time=time.strftime('%Y-%m-%d')
+	str_time=time.strftime('%Y%m%d%H')
+	print str_time
+	db_name="scanner_%s"%(str_time)
+	db_r_name="scanner_robot_%s"%(str_time)
+	
+	conn=MySQLdb.connect(host=dbaddr,user=dbuser,passwd=pwd,db=dbn)
+	cur=conn.cursor()
+	cur.execute("create table %s like scanner"%(db_name))
+	conn.commit()
+	cur.execute("create table %s like scanner_robot"%(db_r_name))
+	conn.commit()
+	cur.close()
+	conn.close()
+
+init_config()
+init_db()
+
+
+
+
 import requests
 from socket import *
 import zlib,fcntl
@@ -25,50 +92,20 @@ header={
 dmbl=["www.socialrel8.com","newsnear-alpha.elasticbeanstalk.com","www.healpay.com","www.draftkings.com","r1.draftkings.com","r2.draftkings.com","r3.draftkings.com","www.brightedge.com","www.maydesigns.com","www.letstaggle.com"]
 ipbl=[]
 DEBUG=False
-MAXDBLEN=20
-CONTENT_LIMIT=512000
-MAXLEN=8388608
-go_worker_no=220
+
 
 start_time=time.strftime('%Y-%m-%d')
 str_time=time.strftime('%Y%m%d')
 db_name="scanner_%s"%(str_time)
 db_r_name="scanner_robot_%s"%(str_time)
 
-"""
-conn=MySQLdb.connect(host='localhost',user='root',passwd='w82776569',db='scan1')
-cur=conn.cursor()
-cur.execute("create table %s like scanner"%(db_name))
-conn.commit()
-cur.execute("create table %s like scanner_robot"%(db_r_name))
-conn.commit()
-cur.close()
-conn.close()
-"""
+
 dbaddr="localhost"
 dbuser="root"
 pwd="w82776569"
 dbn="scan1"
 
-def init_db():
-	global start_time
-	global str_time
-	global db_name
-	global db_r_name
-	
-	start_time=time.strftime('%Y-%m-%d')
-	str_time=time.strftime('%Y%m%d')
-	db_name="scanner_%s"%(str_time)
-	db_r_name="scanner_robot_%s"%(str_time)
-	
-	conn=MySQLdb.connect(host=dbaddr,user=dbuser,passwd=pwd,db=dbn)
-	cur=conn.cursor()
-	cur.execute("create table %s like scanner"%(db_name))
-	conn.commit()
-	cur.execute("create table %s like scanner_robot"%(db_r_name))
-	conn.commit()
-	cur.close()
-	conn.close()
+
 
 class UserDefinedException(Exception):
 	class LongTimeoutError(Exception):
@@ -296,7 +333,7 @@ class Crawler(object):
 			return flag,r,rcode,rheader,rtt
 		else:
 			if rheader.has_key('content-length'):
-				if int(rheader['content-length']) >=MAXLEN:
+				if int(rheader['content-length']) >=MAX_CONTENT_LENGTH:
 					return False,"TargetSizeTooLarge",rcode,rheader,rtt
 
 			if rheader.has_key('content-type'):
@@ -304,7 +341,7 @@ class Crawler(object):
 					if rheader['content-type'].find(ft)!=-1:
 						return False,"TargetTypeFiltered",rcode,rheader,rtt
 			try:
-				content=r.content[0:CONTENT_LIMIT]
+				content=r.content[0:CONTENT_LENGTH_LIMIT]
 			except:
 				return False,"UnexceptedError",rcode,rheader,rtt
 				
@@ -328,7 +365,7 @@ def go(fin,sc):
 	init_db()
 	m=Manager()
 	ipbl=[]
-	for i in range(0,go_worker_no):
+	for i in range(0,WORKER_NO):
 		m.add_worker(worker,i,sc)
 	for d in dmbl:
 		ipbl=ipbl+[v.strip("\n") for v in os.popen("dig +short %s"%(d)).readlines()]
@@ -342,7 +379,7 @@ def go(fin,sc):
 			continue
 		m.inq.put(ip)
 	
-	m.run_manger(go_worker_no)
+	m.run_manger(WORKER_NO)
 	m.wait()
 
 
@@ -360,6 +397,7 @@ def test():
 if __name__ == '__main__':
 	#url="http://54.245.231.247"
 	print "start work"
+	print DB_PWD
 	go("ec2_ip_mar.li",1)
 
 
