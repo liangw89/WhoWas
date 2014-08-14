@@ -177,16 +177,25 @@ def get_open_ports(ip):
 		res=probe_port(ip, 22)
 	return res
 
-"""need to fix it"""
-def worker(inq,no,probe_flag=True):
-	#print i,j
+def worker(inq,worker_id,probe_flag=True):
+	"""
+	Returns : None
+	:param inq: the target worker queue
+	:param no : the worker id 
+	:probe_flag : if probe_flag is True, the worker will probe an IP "X"
+	before fetching the content, otherwise trying to fetch the content on 
+	"http://X" directly
+	"""
 	c=Crawler()
-	
+	#buffer for webpage related records
 	tb_base=[]
+	#buffer for robots.txt related records
 	tb_robot=[]
 	tb_base_len=0
 	tb_robot_len=0
+	#Loop unitl get "STOP"  
 	for tip in iter(inq.get, 'STOP'):
+		#By default use http protocol
 		turl="http://"+tip
 		res=[]
 		fetch_flag=1
@@ -203,21 +212,26 @@ def worker(inq,no,probe_flag=True):
 				elif 443 in res:
 					turl="https://"+tip
 				else:
+					#If only open 22, not fetch the content
 					fetch_flag=0
 			
 			rcode=""
 			rheader=""
 			content=""
-			turl_r=turl+"/robots.txt"
-			rbflag=False
 			rbcontent=""
 			rtt=""
 			rbrtt=""
+			#Default url for robots.txt file
+			turl_r=turl+"/robots.txt"
+			rbflag=False
+			#First check the robots.txt file, if our crawler is allowed,
+			#then fetch the content hosting on that IP
 			if fetch_flag==1:
 				try:
 					rbflag,rbcontent,rbrtt=c.get_robot(turl_r)
 					if rbcontent:
 						rbcontent=unicode(rbcontent,errors='ignore').encode('utf-8')
+					#Generate a robot.txt related record and store in the buffer
 					tb_robot.append((tip,rbcontent,str(int(time.time())),str(rbrtt)))
 					tb_robot_len=tb_robot_len+1
 				except:
@@ -237,11 +251,16 @@ def worker(inq,no,probe_flag=True):
 					content="ROBOT"
 			if content:
 				content=unicode(content,errors='ignore').encode('utf-8')
+
+			#Generate a webpage related record and store in the buffer
 			rport=sorted([str(v) for v in res])
 			rport="#".join(rport)
 			tb_base.append((tip,rport,rcode,str(rheader),content,str(int(time.time())), str(rtt)))
 			tb_base_len=tb_base_len+1
 
+			#Insert the results into database. Two buffers are used to store the results.
+			#If the buffer is "full", which means the buffer stores a given number of records,
+			#insert the records into db and clear the buffer
 			if tb_base_len==RECORD_NO_LIMIT:
 				excute_sql_bulk_no_return("INSERT INTO "+TB_BASE_NAME+"(ip,port,code,header,content,time,rtt) VALUES (%s,%s,%s,%s,%s,%s,%s)",tb_base)
 				tb_base=[]
@@ -255,13 +274,14 @@ def worker(inq,no,probe_flag=True):
 			f.write("unknown:"+tip+"\n")
 			f.close()
 			pass
+	#Clear the buffer.
 	excute_sql_bulk_no_return("INSERT INTO "+TB_BASE_NAME+"(ip,port,code,header,content,time,rtt) VALUES (%s,%s,%s,%s,%s,%s,%s)",tb_base)
 	excute_sql_bulk_no_return("INSERT INTO "+TB_ROBOT_NAME+"(ip,content,time,rtt) VALUES (%s,%s,%s,%s)",tb_robot)
 	tb_base=[]
 	tb_robot=[]
 	tb_base_len=0
 	tb_robot_len=0
-	print no,"worker finish"
+	print worker_id,"worker finish"
 	
 
 
@@ -284,18 +304,28 @@ def go(fin,sc):
 		if ip in ipbl:
 			print ip,"in bl"
 			continue
-		m.inq.put(ip)
+		#m.inq.put(ip)
+		m.add_job(ip)
 	
 	m.run_manger(WORKER_NO)
 	m.wait()
 
 
 class UserDefinedException(Exception):
+	"""User defined exception"""
 	class LongTimeoutError(Exception):
 		args="LongTimeOut Error"
 
+
 class LongTimeout(object):
-	"""docstring for """
+	"""A decorator, throw LongTimeoutError exception if the running time of 
+	a function exceeds a specific seconds.
+	:param timeout: timeout for the target function
+	Usage::
+		@LongTimeout(10)
+		def test():
+			pass
+	"""
 	def __init__(self, timeout):
 		self.timeout=timeout
 
@@ -319,7 +349,14 @@ class LongTimeout(object):
 
 class Manager(object):
 	"""
-	This is a multiprocess queue.
+	This is a multiprocess framework. There are two queues: a multiprocess worker queue 
+	and an input queue. The workers keep getting data from the input queue and execute them 
+	until a stop requirement is meet.
+	Usage::
+		1.
+		2.
+		3.
+
 	"""
 	def __init__(self):
 		self.inq=multiprocessing.Queue()
@@ -331,6 +368,9 @@ class Manager(object):
 		self.pool.append(p)
 		p.daemon = True
 		p.start()
+
+	def add_job(job):
+		self.inq.put(job)
 
 	def run_manger(self,no):
 		stop_flag=0
