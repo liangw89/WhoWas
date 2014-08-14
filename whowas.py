@@ -38,6 +38,7 @@ def init_config():
 	global MAX_CONTENT_LENGTH
 	global RECORD_NO_LIMIT
 	global BLACKIST_FILE
+	global BLACLIST
 
 	global HTTP_HEADER
 
@@ -111,6 +112,8 @@ def init_config():
 	TB_ROBOT_NAME="%s%s"%(TB_ROBOT_PREFIX,TB_SUFFIX)
 
 
+
+
 def excute_sql_no_return(sql):
 	conn=sqldb.connect(host=DB_ADDR,user=DB_USER,passwd=DB_PWD,db=DB_NAME)
 	cur=conn.cursor()
@@ -149,6 +152,12 @@ def create_tb():
 	"""
 	excute_sql_no_return("create table %s like %s"%(TB_BASE_NAME,TB_BASE_TEMPLATE))
 	excute_sql_no_return("create table %s like %s"%(TB_ROBOT_NAME,TB_ROBOT_TEMPLATE))
+
+def init_blacklist():
+	buf=[ v.strip("\n") for v in open(BLACKIST_FILE).readlines() if v[0]!="#"]
+	for t in buf:
+		BLACLIST=BLACLIST+[v.strip("\n") for v in os.popen("dig +short %s"%(t)).readlines()]
+
 
 def probe_port(ip,*ports):
 	"""
