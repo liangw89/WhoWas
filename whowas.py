@@ -293,7 +293,7 @@ def go(fin,sc):
 	m=Manager()
 	ipbl=[]
 	for i in range(0,WORKER_NO):
-		m.add_worker(worker,i,sc)
+		m.add_job(worker,i,sc)
 	for d in dmbl:
 		ipbl=ipbl+[v.strip("\n") for v in os.popen("dig +short %s"%(d)).readlines()]
 	ipbl=ipbl+[v.strip("\n") for v in open("blacklist").readlines()]
@@ -305,7 +305,7 @@ def go(fin,sc):
 			print ip,"in bl"
 			continue
 		#m.inq.put(ip)
-		m.add_job(ip)
+		m.add_input(ip)
 	
 	m.run_manger(WORKER_NO)
 	m.wait()
@@ -350,34 +350,50 @@ class LongTimeout(object):
 class Manager(object):
 	"""
 	This is a multiprocess framework. There are two queues: a multiprocess worker queue 
-	and an input queue. The workers keep getting data from the input queue and execute them 
-	until a stop requirement is meet.
+	and an input queue. The workers keep getting data from the input queue and execute the 
+	specified job until a stop requirement is meet. The workers share the input queue.
 	Usage::
-		1.
-		2.
-		3.
+		1. Init Manager
+		2. Use add_job to specific the Job (a function) a worker will execute
+		3. Use add_input to add input data to the input queue. 
+		4. Run the manager.
+	Example :: 
+		#use 10 processes to print 1-10000
+		def _print(inq):
+			for no in iter(inq.get, 'STOP')
+				print no
 
+		def run():
+			m=Manager()
+			for i in xrange(10):
+				m.add_job(_print)
+
+			for i in xrange(10)
+				m.add_input(i)
+			m.run_manger(1)
+			m.wait()
 	"""
 	def __init__(self):
 		self.inq=multiprocessing.Queue()
 		self.pool=[]
-		self.level=0
+		self.worker_no=0
 
-	def add_worker(self,func,work_id,probe_flag):
-		p=multiprocessing.Process(target=func, args=(self.inq,work_id,probe_flag))
+	def add_job(self,func,worker_id,probe_flag):
+		self.worker_no+=1
+		p=multiprocessing.Process(target=func, args=(self.inq,worker_id,probe_flag))
 		self.pool.append(p)
 		p.daemon = True
 		p.start()
 
-	def add_job(job):
+	def add_input(job):
 		self.inq.put(job)
 
 	def run_manger(self,no):
 		stop_flag=0
-		work_no=no
+		stop_no=no
 		while True:
-			if stop_flag>=work_no:
-				for i in range(work_no):
+			if stop_flag>=stop_no:
+				for i in range(self.worker_no):
 					self.inq.put('STOP')
 				break
 			if self.inq.empty():
