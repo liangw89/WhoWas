@@ -60,6 +60,9 @@ def init_config():
 	MAX_CONTENT_LENGTH=config.get('Basic','MAX_CONTENT_LENGTH')
 	RECORD_NO_LIMIT=config.get('Basic','RECORD_NO_LIMIT')
 	BLACKIST_FILE=config.get('Basic','BLACKIST_FILE')
+	PROBE_DEFAULT_TIMEOUT= config.get('Basic','PROBE_DEFAULT_TIMEOUT')
+	HTTP_DEFAULT_TIMEOUT=config.get('Basic','HTTP_DEFAULT_TIMEOUT')
+	HTTP_LONG_TIMEOUT=config.get('Basic','HTTP_LONG_TIMEOUT')
 
 	HTTP_HEADER={
 	"User-Agent":"Mozilla/5.0 (X11; U; Linux i686)",
@@ -160,7 +163,7 @@ def probe_port(ip,*ports):
 	"""
 	res=[]
 	for port in ports:
-		if sr1(IP(dst=ip)/TCP(dport=port, flags='S'), verbose=0, timeout=1):
+		if sr1(IP(dst=ip)/TCP(dport=port, flags='S'), verbose=0, timeout=PROBE_DEFAULT_TIMEOUT):
 			res.append(port)
 	return res
 
@@ -349,9 +352,10 @@ class LongTimeout(object):
 
 class Manager(object):
 	"""
-	This is a multiprocess framework. There are two queues: a multiprocess worker queue 
-	and an input queue. The workers keep getting data from the input queue and execute the 
-	specified job until a stop requirement is meet. The workers share the input queue.
+	This is a multiprocess framework. There are two queues: a multiprocess 
+	worker queue and an input queue. The workers keep getting data from the 
+	input queue and execute the specified job until a stop requirement is meet. 
+	The workers share the input queue.
 	Usage::
 		1. Init Manager
 		2. Use add_job to specific the Job (a function) a worker will execute
@@ -368,7 +372,7 @@ class Manager(object):
 			for i in xrange(10):
 				m.add_job(_print)
 
-			for i in xrange(10)
+			for i in xrange(10000)
 				m.add_input(i)
 			m.run_manger(1)
 			m.wait()
@@ -406,14 +410,18 @@ class Manager(object):
 			t.join()
 
 
-"""need to fix"""
 class Crawler(object):
-	"""docstring for """
+	
 	def __init__(self):
-		self.timeout=10
+		self.timeout=HTTP_DEFAULT_TIMEOUT
 		self.type_filter=['application/','audio/','image/','video/']
 
+
 	def get_header(self,url,verf=False):
+		"""
+		Use Python requests stream request, first check the header of response, 
+		grab the necessary information, if no exceptions are thrown, fetch the body.
+		"""
 		url=url
 		history={}
 		run_flag=True
@@ -426,9 +434,11 @@ class Crawler(object):
 			return False,str(e.args)[0:15],False,False,False
 		return True,r,r.status_code,dict(**r.headers),r.elapsed.total_seconds()
 
-	@LongTimeout(12)
+	@LongTimeout(HTTP_LONG_TIMEOUT)
 	def get_content(self,url):
-
+		"""
+		Fetch the content of a webpage 
+		"""
 		flag,r,rcode,rheader,rtt=self.get_header(url)
 		if not flag:
 			return flag,r,rcode,rheader,rtt
@@ -448,8 +458,11 @@ class Crawler(object):
 				
 			return True,content,rcode,rheader,rtt
 
-	@LongTimeout(12)
+	@LongTimeout(HTTP_LONG_TIMEOUT)
 	def get_robot(self,url):
+		"""
+		Check the robots.txt 
+		"""
 		try:
 			rp = robotparser.RobotFileParser()
 			rp.set_url(url)
