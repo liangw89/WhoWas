@@ -91,12 +91,4 @@ for i in xrange(query_no):
 
 
 conn.close()
-"""
-t1=nilsimsa.Nilsimsa(c[0]).hexdigest()
-t2=nilsimsa.Nilsimsa(c[1]).hexdigest()
-print compare_hexdigests(t1,t2)
-t1=simhash(c[0],hashbits=128)
-t2=simhash(c[1],hashbits=128)
-print t1.hex()
-print t1.similarity(t2)
-"""
+

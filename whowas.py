@@ -303,20 +303,15 @@ def go(fin,sc):
 	create_tb()
 	sys.exit()
 	m=Manager()
-	ipbl=[]
 	for i in range(0,WORKER_NO):
 		m.add_job(worker,i,sc)
-	for d in dmbl:
-		ipbl=ipbl+[v.strip("\n") for v in os.popen("dig +short %s"%(d)).readlines()]
-	ipbl=ipbl+[v.strip("\n") for v in open("blacklist").readlines()]
-	print ipbl
-	#sys.exit()
+
 	for i in open(fin):
 		ip=i.strip("\n")
-		if ip in ipbl:
+		if ip in BLACLIST:
 			print ip,"in bl"
+			#log
 			continue
-		#m.inq.put(ip)
 		m.add_input(ip)
 	
 	m.run_manger(WORKER_NO)
