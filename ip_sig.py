@@ -1,8 +1,6 @@
 import MySQLdb,re
 from hashes.simhash import simhash
-#import nilsimsa
-#from hashes.simhash import simhash
-#from nilsimsa import *
+
 import sys
 db_name=sys.argv[1]
 #db_name="scanner_20130930"
