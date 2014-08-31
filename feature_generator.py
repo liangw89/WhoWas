@@ -1,7 +1,7 @@
 import MySQLdb,re
 from hashes.simhash import simhash
-
 import sys
+
 db_name=sys.argv[1]
 #db_name="scanner_20130930"
 conn=MySQLdb.connect(host='111',user='11',passwd='111',db="11")
