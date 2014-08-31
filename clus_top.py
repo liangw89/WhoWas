@@ -2,6 +2,7 @@ from datetime import datetime
 from config import *
 from common import *
 
+
 conn=sqldb.connect(host=DB_HOST,user=DB_USER,passwd=DB_PWD,db=DB_NAME)
 
 def get_top_cluster_tb_tm(tb,tm):
@@ -38,6 +39,7 @@ def merge_top_clusters(target_clus,res_clus):
 
 if __name__ == '__main__':
 	pass
+
 	"""
 	usage example:
 	res_clus={}

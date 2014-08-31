@@ -2,26 +2,21 @@ import MySQLdb,re
 from hashes.simhash import simhash
 import sys
 
-db_name=sys.argv[1]
-#db_name="scanner_20130930"
-conn=MySQLdb.connect(host='111',user='11',passwd='111',db="11")
-sql="select count(*) from %s where code !='' and code !='0'"%(db_name)
-cur=conn.cursor()
-cur.execute(sql)
-rd_no=cur.fetchall()[0][0]
-page_no=5000
-query_no=rd_no/page_no+1
-print query_no,rd_no
 
-def grab_content(row):
-	sql="select ip,code,time,header,content from %s where code !='' and code !='0' limit %s,%s"%(db_name,row,page_no)
-	cur=conn.cursor()
-	cur.execute(sql)
-	a=cur.fetchall()
-	cur.close()
-	return a
+conn=sqldb.connect(host=DB_HOST,user=DB_USER,passwd=DB_PWD,db=DB_NAME)
+def get_record_no(tb):
+	sql="select count(*) from %s where code !='' and code !='0' and content!='ROBOT'"%(tb)
+	buff=run_sql_with_return(sql)
+	return buff[0][0]
 
-def feature_from_header(h):
+def get_query_no(tb,record_no,page_no):
+	return record_no/page_no+1
+
+def get_record(tb,offset,page_no):
+	sql="select ip,code,time,header,content from %s where code !='' and code !='0' and content!='ROBOT' limit %s,%s"%(tb,offset,page_no)
+	return run_sql_with_return(sql)
+
+def get_feature_from_header(h):
 	feature_dict={}
 	try:
 		h=eval(h)
@@ -42,7 +37,7 @@ def feature_from_header(h):
 	feature_dict["hstr"]=str(h)
 	return feature_dict
 
-def feature_from_content(c):
+def get_feature_from_content(c):
 	feature_dict={}
 	"""
 	tl=re.findall("<title.*?\/title>",c)
@@ -71,29 +66,24 @@ def feature_from_content(c):
 	feature_dict["clen"]=len(c)
 	return feature_dict
 
-def ip_sig(ip,code,tm,h,c):
-	d1=feature_from_header(h)
-	d2=feature_from_content(c)
+def get_record_feature(ip,code,tm,h,c):
+	d1=get_feature_from_header(h)
+	d2=get_feature_from_content(c)
 	d=dict(d1,**d2)
 	d=(ip,code,tm,d["hlen"],d["hserver"],d["hfield"],d["hstr"],d["ctitle"],d["ckws"],d["ctmpl"],d["gid"],d["dm"],d["chash"],d["clen"])
 	return d
 
-
-start=0
-for i in xrange(query_no):
-	start=i*page_no
-	print "begin offset",start
-	tmp=grab_content(start)
-	res=[]
-	for t in tmp:
-		res.append(ip_sig(t[0],t[1],t[2],t[3],t[4]))
-	sql="insert into ip_sig_st values(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)"
-	cur=conn.cursor()
-	cur.executemany(sql,res)
-	conn.commit()
-	cur.close()
-
-
-
-conn.close()
+def get_all_feature(tb):
+	page_no=5000
+	record_no=get_record_no(tb)
+	query_no=get_query_no(tb,record_no,page_no)
+	offset=0
+	for i in xrange(query_no):
+		offset=i*page_no
+		tmp=get_record(tb,offset,page_no)
+		param=[]
+		for t in tmp:
+			param.append(get_record_feature(t[0],t[1],t[2],t[3],t[4]))
+		sql="insert into ip_sig_st values(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)"
+		run_sql_bulk_no_return(sql,param,conn)
 

@@ -1,4 +1,4 @@
-import os,sys,cPickle,time,urllib2,re,signal,commands,errno,ConfigParser
+import os,sys,cPickle,time,urllib2,re,signal,commands,errno
 import requests
 import zlib,fcntl
 import multiprocessing
