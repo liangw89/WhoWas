@@ -137,17 +137,12 @@ def worker(inq,worker_id,probe_flag=True):
 					tb_robot_len=tb_robot_len+1
 				except:
 					rbflag=True
-					f=open("err.log","a")
-					f.write("robot:"+tip+"\n")
-					f.close()
-					pass
+					logger.error("Fail to get robots.txt from IP: %s",tip)
 				if rbflag:
 					try:
 						flag,content,rcode,rheader,rtt=c.get_content(turl)
 					except:
-						f=open("err.log","a")
-						f.write("content:"+tip+"\n")
-						f.close()
+						logger.error("Fail to get content from IP: %s",tip)
 				else:
 					content="ROBOT"
 			if content:
@@ -171,10 +166,7 @@ def worker(inq,worker_id,probe_flag=True):
 				tb_robot=[]
 				tb_robot_len=0
 		except:
-			f=open("err.log","a")
-			f.write("unknown:"+tip+"\n")
-			f.close()
-			pass
+			logger.error("Unknown errors from IP: %s",tip)
 	#Clear the buffer.
 	excute_sql_bulk_no_return("INSERT INTO "+TB_BASE_NAME+"(ip,port,code,header,content,time,rtt) VALUES (%s,%s,%s,%s,%s,%s,%s)",tb_base)
 	excute_sql_bulk_no_return("INSERT INTO "+TB_ROBOT_NAME+"(ip,content,time,rtt) VALUES (%s,%s,%s,%s)",tb_robot)
@@ -182,7 +174,7 @@ def worker(inq,worker_id,probe_flag=True):
 	tb_robot=[]
 	tb_base_len=0
 	tb_robot_len=0
-	print worker_id,"worker finish"
+	logger.info("%s worker finish!",worker_id)
 	
 
 

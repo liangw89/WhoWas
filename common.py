@@ -8,6 +8,10 @@ import cPickle
 import time
 from datetime import datetime
 import re
+from logger import *
+
+logger= logging.getLogger("logging")
+#logger.debug("Register guard %s,%s",nid,self.tb_guards[nid].__dict__)
 
 def run_sql_no_return(sql,conn):
 	"""
@@ -18,7 +22,7 @@ def run_sql_no_return(sql,conn):
 		cur.execute(sql)
 		conn.commit()
 	except Exception, e:
-		print e #change to log
+		logger.error("SQL ERROR: %s",e)
 	cur.close()
 	conn.close()
 
@@ -31,7 +35,7 @@ def run_sql_bulk_no_return(sql, param,conn):
 		cur.executemany(sql,param)
 		conn.commit()
 	except Exception, e:
-		print e #change to log
+		logger.error("SQL ERROR: %s",e)
 	cur.close()
 	conn.close()
 
