@@ -1,0 +1,11 @@
+depenency: 
+sudo pip install requests==2.3.0
+sudo pip install logutils
+sudo pip install pymysql
+sudo pip install python-hashes
+
+1. configure.py: set basic parameters in the file
+2. scanner.py: prob+webpage feteching
+3. feature.py: feature extractor
+4. clus_top.py: top-level clusters
+5. clus_sub.py: get the final clustering results.

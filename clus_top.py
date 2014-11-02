@@ -2,10 +2,7 @@ from datetime import datetime
 from config import *
 from common import *
 
-
-conn=sqldb.connect(host=DB_HOST,user=DB_USER,passwd=DB_PWD,db=DB_NAME)
-
-def get_top_cluster_tb_tm(tb,tm):
+def get_top_cluster_tb_tm(tb,tm, conn):
 	"""
 	We assume the feature records may be stored in multiple tables, this function 
 	generate the top-level clusters at a given time.
@@ -15,16 +12,16 @@ def get_top_cluster_tb_tm(tb,tm):
 		<GID,CTITLE,CTMPLE,CKWS,HSERVER>: [<IP_1,TIME,CHASH_1>,... ,<IP_N,TIME,CHASH_N>] 
 	"""
 	res={}
-	#ip_reg is where stores the target IP address.
-	sql="select ip,chash,gid,ctitle,ctmpl,ckws,hserver from %s where time='%s' and ip in (select ip from ip_reg) "%(tb,tm)
-	buff=run_sql_with_return(sql,conn)
+	# ip_reg is where stores the target IP address.
+	sql="SELECT ip, chash, gid, ctitle, ctmpl, ckws, hserver FROM %s WHERE time = '%s' AND ip IN (SELECT ip FROM ip_reg) " % (tb,tm)
+	buff=run_sql_with_return(sql, conn)
 	for k in buff:
-		k1=(k[0],tm,k[1])
-		k2=k[2:]
+		k1 = (k[0],tm,k[1])
+		k2 = k[2:]
 		if k2 in res:
 			res[k2].append(k1)
 		else:
-			res[k2]=[k1]
+			res[k2] = [k1]
 	return res
 
 def merge_top_clusters(target_clus,res_clus):
@@ -34,7 +31,7 @@ def merge_top_clusters(target_clus,res_clus):
 		<GID,CTITLE,CTMPLE,CKWS,HSERVER>: [<IP_1,TIME_1,CHASH_1>,... ,<IP_N,TIME_N,CHASH_N>] 
 	"""
 	for k in target_clus:
-		res[k]=res[k]+target_clus[k] if k in res else target_clus[k]
+		res_clus[k] = res_clus[k] + target_clus[k] if k in res_clus else target_clus[k]
 	return res_clus
 
 if __name__ == '__main__':
