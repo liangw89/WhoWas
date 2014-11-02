@@ -1,4 +1,4 @@
-depenency: 
+dependency: 
 sudo pip install requests==2.3.0
 sudo pip install logutils
 sudo pip install pymysql
